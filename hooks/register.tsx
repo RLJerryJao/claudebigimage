@@ -25,6 +25,8 @@ let isChecking = false
 let isTerminal = false
 // The images the person closed the pane over, so it stays closed until they change.
 let dismissedKey: string | undefined
+// Whether the person has been told, once a session, how to open a pane the terminal was too narrow for.
+let isHinted = false
 const sizes = new Map<string, Size | null>()
 
 // Claude Code caches each paste as <tmp>/<project>/<session>/images/<n>.png. The project
@@ -91,6 +93,10 @@ async function openPane($: EngineInterface, list: PastedImage[], limits: Limits)
   const want = paneRequest(list.map(image => image.size), limits)
   const opened = await $.ui.open({ id: PANE, title: 'Image preview', rows: want.rows, columns: want.columns })
   await update($, paneShown, () => opened.isPlaced)
+  if (!opened.isPlaced && !isHinted) {
+    isHinted = true
+    $.ui.toast(`image-view: run /${COMMAND} for a big preview (the terminal is too narrow to open it by itself)`)
+  }
 }
 
 // A pane opened while the terminal was too narrow seats itself once it widens; follow it.

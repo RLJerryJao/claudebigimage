@@ -90,6 +90,8 @@ Other terminals show `[Image #n]` in each tile instead of the picture. The Claud
 
 ## Troubleshooting
 
+**The images are still small.** The terminal is too small to give them room. In fullscreen the band above the prompt gets at most half the terminal's height, so a 25-row window leaves the pictures about 2 rows. Make the window bigger, or run `/image-view` to show them in the preview pane (it opens by itself only from 144 columns, and from 110 once you've opened it with `/image-view`).
+
 **Nothing appears when I paste.** Run `/plugin` and check the dim line under the tabs lists `image-view` as an active mod. If it isn't listed, run `/reload-plugins`.
 
 **The tile says "no preview".** The mod couldn't find the cached file. Claude Code may have moved where it stores pasted images. Please [open an issue](https://github.com/joshhu/claudebigimage/issues) with your Claude Code version.

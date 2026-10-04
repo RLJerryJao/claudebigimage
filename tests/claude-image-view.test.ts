@@ -102,7 +102,7 @@ type On = Parameters<TestBody>[1]
 
 /** Stands in for the engine: a draft, one cached 800x400 PNG (#1), and a pane seated or not. */
 function engine(on: On, draft: { text: string }, isPlaced: boolean) {
-  const calls = { opened: [] as unknown[], closed: 0 }
+  const calls = { opened: [] as unknown[], closed: 0, toasts: [] as string[] }
   let isOpen = false
   on('session.start', () => ({ cwd: '/work' }))
   on('command.register', ($, e) => ({ value: { command: e.name } }))
@@ -133,6 +133,10 @@ function engine(on: On, draft: { text: string }, isPlaced: boolean) {
     isOpen = false
     return { value: undefined }
   })
+  on('ui.toast', ($, e) => {
+    calls.toasts.push(e.text)
+    return { value: undefined }
+  })
   on('ui.render', () => ({ type: 'Text', props: {}, children: ['engine band'] }))
   return calls
 }
@@ -153,6 +157,8 @@ test('on a narrow terminal the band shows a pasted image without another keystro
   expect(await ui.find({ type: 'Text', text: 'no preview' })).toBeDefined()
   await ui.unmount()
   expect(calls.opened).toHaveLength(1)
+  // The pane couldn't seat, so the person hears once how to open it.
+  expect(calls.toasts).toEqual(['image-view: run /image-view for a big preview (the terminal is too narrow to open it by itself)'])
 
   // Sending the prompt empties the box, which clears the band and closes the waiting pane.
   draft.text = ''
@@ -171,6 +177,7 @@ test('where the pane seats, it shows the image big and the band stays empty', as
   await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/work' })
   await clock.advance(200)
   expect(calls.opened[0]).toMatchObject({ id: 'image-preview', rows: 21, columns: 80 })
+  expect(calls.toasts).toEqual([])
 
   const band = await $.ui.mount({ ...BAND, surface: 'terminal' })
   expect(await band.find({ type: 'Image' })).toBeUndefined()
