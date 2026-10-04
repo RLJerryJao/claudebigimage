@@ -48,11 +48,12 @@ Paste one or more images and a row of thumbnails sits above the prompt, each lab
 ❯ why is the header misaligned here [Image #1] vs [Image #2]
 ```
 
+- **Big previews in a pane.** On a wide terminal (144 columns or more) pasted images open in an *Image preview* pane: docked beside the transcript, floor to ceiling, in fullscreen, or above the prompt otherwise. Each image shows up to 20 rows tall and 80 columns wide by default (see [Configuration](#configuration)).
+- **`/image-view` opens it anywhere.** On a narrower terminal the images show in the row above the prompt instead; run `/image-view` to open the pane at any width. Close the pane and it stays closed until you paste a different image.
 - **Thumbnails appear as soon as you paste.** You don't have to type another key first.
-- **Big previews, not tiny thumbnails.** A pasted image shows up to 20 rows tall and 80 columns wide by default (see [Configuration](#configuration)).
 - **Thumbnails keep their shape.** Wide screenshots stay wide and phone shots stay tall.
 - **Always fits on screen.** Tiles shrink to fit the space above the prompt (and never take more than two thirds of the terminal's height), so the row never scrolls or gets cut off.
-- **Clears on send.** Once the prompt is sent (or the tags are deleted), the row goes away.
+- **Clears on send.** Once the prompt is sent (or the tags are deleted), the row and the pane go away.
 
 ## Configuration
 
@@ -71,7 +72,7 @@ Claude Code saves every pasted image to a cache folder for the session, as `<tmp
 
 1. Every 200ms it reads the prompt box and looks for `[Image #n]` tags. It checks on a timer because pasting an image doesn't raise an edit event.
 2. For each tag it finds the cached PNG and reads its size from the PNG header.
-3. It draws the thumbnails in the band above the prompt with Claude Code's `Image` element. The terminal reads the file itself, so the image data never passes through the mod.
+3. It opens a pane for them, or draws them in the band above the prompt when the pane can't be seated, with Claude Code's `Image` element. The terminal reads the file itself, so the image data never passes through the mod.
 
 ## Security
 

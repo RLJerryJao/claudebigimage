@@ -2,14 +2,18 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
 import type { PastedImage } from '../types'
-import { clampLimits, fitRow, imageNumbers, pngSize } from './layout'
-import type { Size } from './layout'
+import { clampLimits, fitColumn, fitRow, imageNumbers, paneRequest, pngSize } from './layout'
+import type { Limits, Size } from './layout'
 
 // Pasting an image raises no prompt.edit (the tag only shows up on the next keystroke),
 // so the draft is polled instead.
 const POLL_MS = 200
 
+const PANE = 'image-preview'
+const COMMAND = 'image-view'
+
 const images = atom({ plugin: 'image-view', key: 'images' } as const, [] as PastedImage[])
+const paneShown = atom({ plugin: 'image-view', key: 'paneShown' } as const, false)
 
 let tmpRoot: string | undefined
 let found: { sessionId: string; dir: string } | undefined
@@ -17,6 +21,10 @@ let found: { sessionId: string; dir: string } | undefined
 // while a drawn image's file is still missing, so the next poll looks again.
 let shownKey: string | undefined
 let isChecking = false
+// Only the terminal draws pictures; elsewhere the band and the pane stay out of the way.
+let isTerminal = false
+// The images the person closed the pane over, so it stays closed until they change.
+let dismissedKey: string | undefined
 const sizes = new Map<string, Size | null>()
 
 // Claude Code caches each paste as <tmp>/<project>/<session>/images/<n>.png. The project
@@ -54,7 +62,7 @@ async function describe($: EngineInterface, dir: string | undefined, n: number):
   return { n, path, size: sizes.get(path) ?? null }
 }
 
-async function show($: EngineInterface, draft: string) {
+async function show($: EngineInterface, draft: string, limits: Limits) {
   const numbers = imageNumbers(draft)
   const key = numbers.join(',')
   if (key === shownKey) return
@@ -63,13 +71,41 @@ async function show($: EngineInterface, draft: string) {
   for (const n of numbers) list.push(await describe($, dir, n))
   shownKey = list.every(image => image.path !== null) ? key : undefined
   await update($, images, () => list)
+  await syncPane($, key, list, limits)
 }
 
-async function check($: EngineInterface) {
+/** Opens the preview pane over pasted images and closes it once the draft has none. */
+async function syncPane($: EngineInterface, key: string, list: PastedImage[], limits: Limits) {
+  if (!isTerminal) return
+  if (list.length === 0) {
+    dismissedKey = undefined
+    if ((await $.ui.panes()).some(pane => pane.id === PANE)) await $.ui.close({ id: PANE })
+    await update($, paneShown, () => false)
+    return
+  }
+  if (key === dismissedKey) return
+  await openPane($, list, limits)
+}
+
+async function openPane($: EngineInterface, list: PastedImage[], limits: Limits) {
+  const want = paneRequest(list.map(image => image.size), limits)
+  const opened = await $.ui.open({ id: PANE, title: 'Image preview', rows: want.rows, columns: want.columns })
+  await update($, paneShown, () => opened.isPlaced)
+}
+
+// A pane opened while the terminal was too narrow seats itself once it widens; follow it.
+async function followPane($: EngineInterface) {
+  const pane = (await $.ui.panes()).find(one => one.id === PANE)
+  const isShown = pane?.isPlaced === true
+  if (isShown !== (await read($, paneShown))) await update($, paneShown, () => isShown)
+}
+
+async function check($: EngineInterface, limits: Limits) {
   if (isChecking) return
   isChecking = true
   try {
-    await show($, (await $.prompt.read()).text)
+    await show($, (await $.prompt.read()).text, limits)
+    if (isTerminal && shownKey !== '') await followPane($)
   } finally {
     isChecking = false
   }
@@ -79,14 +115,70 @@ export const register: Register = (on, options) => {
   const limits = clampLimits(options.maxHeight, options.maxWidth)
 
   on('session.start', async ($, e, next) => {
-    $.clock.every(POLL_MS, () => check($))
+    isTerminal = e.surface === 'terminal'
+    await $.command.register({ name: COMMAND, description: 'Show the images pasted into the prompt in a large preview pane' })
+    $.clock.every(POLL_MS, () => check($, limits))
     return next(e)
+  })
+
+  // Asked for, the pane seats at any terminal width.
+  on('command.run', { command: COMMAND }, async $ => {
+    const list = await read($, images)
+    if (list.length === 0) return { text: 'No pasted images in the prompt to preview.' }
+    dismissedKey = undefined
+    await openPane($, list, limits)
+    return { text: 'Image preview opened.' }
+  })
+
+  on('ui.close', async ($, e, next) => {
+    if (e.id === PANE) {
+      if (e.origin.kind === 'person') dismissedKey = (await read($, images)).map(image => image.n).join(',')
+      await update($, paneShown, () => false)
+    }
+    return next(e)
+  })
+
+  on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
+    const list = await read($, images)
+    if (e.surface !== 'terminal') {
+      const { Text } = $.ui.resolve(e)
+      return <Text dimColor>{list.map(image => `[Image #${image.n}]`).join(' ') || 'No pasted images.'}</Text>
+    }
+    const { Box, Image, Text } = $.ui.resolve(e)
+    if (list.length === 0) return <Text dimColor>No pasted images.</Text>
+    const cells = fitColumn(list.map(image => image.size), e.props.scroll.bodyRows, e.props.bodyColumns, limits)
+    return (
+      <Box flexDirection="column" alignItems="center">
+        {list.map((image, i) => {
+          const { columns, rows } = cells[i] ?? { columns: 4, rows: 1 }
+          return (
+            <Box flexDirection="column" alignItems="center">
+              {image.path === null ? (
+                <Box width={columns} height={rows} alignItems="center" justifyContent="center">
+                  <Text dimColor wrap="truncate">no preview</Text>
+                </Box>
+              ) : (
+                <Image
+                  key={`pane-image-${image.n}`}
+                  source={{ file: image.path, format: 'png' }}
+                  columns={columns}
+                  rows={rows}
+                  alt={`[Image #${image.n}]`}
+                />
+              )}
+              <Text dimColor>#{image.n}</Text>
+            </Box>
+          )
+        })}
+      </Box>
+    )
   })
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     if (e.surface !== 'terminal' || e.props.hasSurvey) return next(e)
     const list = await read($, images)
-    if (list.length === 0) return next(e)
+    // The pane shows them bigger; don't draw them twice.
+    if (list.length === 0 || (await read($, paneShown))) return next(e)
 
     const { Box, Image, Text } = $.ui.resolve(e)
     const cells = fitRow(list.map(image => image.size), e.props.maxRows, e.props.bodyColumns, limits, e.viewport?.rows)

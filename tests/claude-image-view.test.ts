@@ -1,6 +1,7 @@
 import { expect, mock, test } from 'claude-code/testing'
+import type { TestBody } from 'claude-code/testing'
 
-import { clampLimits, fitCells, fitRow, imageNumbers, pngSize } from '../hooks/layout'
+import { clampLimits, fitCells, fitColumn, fitRow, imageNumbers, paneRequest, pngSize } from '../hooks/layout'
 
 function pngHead(width: number, height: number): string {
   const bytes = new Uint8Array(33)
@@ -52,12 +53,34 @@ test('a row of tiles shrinks to fit the band so it never scrolls', () => {
   expect(fitRow([square], 40, 200, { rows: 6, columns: 32 })).toEqual([{ columns: 12, rows: 6 }])
 })
 
+test('the pane stacks previews and scrolls past a few', () => {
+  const wide = { width: 1600, height: 900 }
+  // One image takes the pane's height, less its label row, within the limits.
+  expect(fitColumn([wide], 40, 100, { rows: 60, columns: 200 })).toEqual([{ columns: 100, rows: 28 }])
+  // Two share it.
+  expect(fitColumn([wide, wide], 40, 100, { rows: 60, columns: 200 })).toEqual([
+    { columns: 68, rows: 19 },
+    { columns: 68, rows: 19 },
+  ])
+  // Many never shrink below 8 rows; the pane scrolls instead.
+  expect(fitColumn([wide, wide, wide, wide, wide, wide], 40, 100, { rows: 60, columns: 200 })[0]).toEqual({ columns: 28, rows: 8 })
+  // A small configured limit still wins.
+  expect(fitColumn([wide], 40, 100, { rows: 6, columns: 32 })).toEqual([{ columns: 21, rows: 6 }])
+})
+
+test('the pane asks for room for every preview', () => {
+  const wide = { width: 1600, height: 900 }
+  expect(paneRequest([wide, { width: 500, height: 500 }])).toEqual({ rows: 20 + 1 + 20 + 1, columns: 71 })
+})
+
 test('configured limits are clamped to what an Image can draw', () => {
   expect(clampLimits(undefined, undefined)).toEqual({ rows: 20, columns: 80 })
   expect(clampLimits(30, 120)).toEqual({ rows: 30, columns: 120 })
   expect(clampLimits(0, 1000)).toEqual({ rows: 1, columns: 255 })
   expect(clampLimits('big', Number.NaN)).toEqual({ rows: 20, columns: 80 })
 })
+
+const DIR = '/tmp/claude-501/-work/sess-1/images'
 
 const BAND = {
   plugin: 'image-view',
@@ -67,12 +90,23 @@ const BAND = {
   props: { hasSurvey: false, isWorking: false, maxRows: 20, bodyColumns: 120, scroll: { offset: 0, bodyRows: 20 }, view: {} },
 } as const
 
-test('a pasted image shows without another keystroke and clears when the draft does', async ($, on) => {
-  const clock = mock.clock(on)
-  const dir = '/tmp/claude-501/-work/sess-1/images'
-  let draft = 'see [Image #1] [Image #2]'
+const PANE = {
+  plugin: 'image-view',
+  component: 'Pane',
+  requestId: 'image-preview',
+  viewport: { columns: 200, rows: 50 },
+  props: { title: 'Image preview', isFocused: false, bodyColumns: 90, placement: 'dock', scroll: { offset: 0, bodyRows: 47 }, view: {} },
+} as const
+
+type On = Parameters<TestBody>[1]
+
+/** Stands in for the engine: a draft, one cached 800x400 PNG (#1), and a pane seated or not. */
+function engine(on: On, draft: { text: string }, isPlaced: boolean) {
+  const calls = { opened: [] as unknown[], closed: 0 }
+  let isOpen = false
   on('session.start', () => ({ cwd: '/work' }))
-  on('prompt.read', () => ({ value: { text: draft, cursor: draft.length } }))
+  on('command.register', ($, e) => ({ value: { command: e.name } }))
+  on('prompt.read', () => ({ value: { text: draft.text, cursor: draft.text.length } }))
   on('env.get', () => ({ value: '/tmp/claude-501' }))
   on('session.id', () => ({ value: 'sess-1' }))
   // Another project's folder and a stray file sit beside the one holding this session.
@@ -84,9 +118,29 @@ test('a pasted image shows without another keystroke and clears when the draft d
       { name: '-work', kind: 'dir', ...entry },
     ],
   }))
-  on('fs.exists', ($, e) => ({ value: e.path === dir || e.path === `${dir}/1.png` }))
+  on('fs.exists', ($, e) => ({ value: e.path === DIR || e.path === `${DIR}/1.png` }))
   on('fs.read', () => ({ value: { base64: pngHead(800, 400) } }))
+  on('ui.open', ($, e) => {
+    calls.opened.push(e)
+    isOpen = true
+    return { value: isPlaced ? { isPlaced: true } : { isPlaced: false, reason: 'narrow' } }
+  })
+  on('ui.panes', () => ({
+    value: isOpen ? [{ id: 'image-preview', title: 'Image preview', isShown: isPlaced, isFocused: false, isPlaced }] : [],
+  }))
+  on('ui.close', () => {
+    calls.closed++
+    isOpen = false
+    return { value: undefined }
+  })
   on('ui.render', () => ({ type: 'Text', props: {}, children: ['engine band'] }))
+  return calls
+}
+
+test('on a narrow terminal the band shows a pasted image without another keystroke', async ($, on) => {
+  const clock = mock.clock(on)
+  const draft = { text: 'see [Image #1] [Image #2]' }
+  const calls = engine(on, draft, false)
 
   await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/work' })
   await clock.advance(200)
@@ -94,31 +148,46 @@ test('a pasted image shows without another keystroke and clears when the draft d
   const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
   const image = await ui.find({ type: 'Image' })
   // 17 rows fit the band, but beside #2's placeholder the row needs 127 columns of 120, so 16.
-  expect(image?.props).toMatchObject({ source: { file: `${dir}/1.png`, format: 'png' }, columns: 64, rows: 16 })
+  expect(image?.props).toMatchObject({ source: { file: `${DIR}/1.png`, format: 'png' }, columns: 64, rows: 16 })
   // #2 has no cached file, so it gets a placeholder tile instead of a broken Image.
   expect(await ui.find({ type: 'Text', text: 'no preview' })).toBeDefined()
   await ui.unmount()
+  expect(calls.opened).toHaveLength(1)
 
-  // Sending the prompt empties the box.
-  draft = ''
+  // Sending the prompt empties the box, which clears the band and closes the waiting pane.
+  draft.text = ''
   await clock.advance(200)
   const after = await $.ui.mount({ ...BAND, surface: 'terminal' })
   expect(await after.find({ type: 'Image' })).toBeUndefined()
   expect(await after.find({ type: 'Text', text: 'engine band' })).toBeDefined()
+  expect(calls.closed).toBe(1)
+})
+
+test('where the pane seats, it shows the image big and the band stays empty', async ($, on) => {
+  const clock = mock.clock(on)
+  const draft = { text: 'see [Image #1]' }
+  const calls = engine(on, draft, true)
+
+  await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/work' })
+  await clock.advance(200)
+  expect(calls.opened[0]).toMatchObject({ id: 'image-preview', rows: 21, columns: 80 })
+
+  const band = await $.ui.mount({ ...BAND, surface: 'terminal' })
+  expect(await band.find({ type: 'Image' })).toBeUndefined()
+  await band.unmount()
+
+  const pane = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  expect((await pane.find({ type: 'Image' }))?.props).toMatchObject({ source: { file: `${DIR}/1.png` }, columns: 80, rows: 20 })
+  await pane.unmount()
+
+  draft.text = ''
+  await clock.advance(200)
+  expect(calls.closed).toBe(1)
 })
 
 test('the size limits come from the plugin options', { options: { maxHeight: 6, maxWidth: 32 } }, async ($, on) => {
   const clock = mock.clock(on)
-  const dir = '/tmp/claude-501/-work/sess-1/images'
-  const draft = 'see [Image #1]'
-  on('session.start', () => ({ cwd: '/work' }))
-  on('prompt.read', () => ({ value: { text: draft, cursor: draft.length } }))
-  on('env.get', () => ({ value: '/tmp/claude-501' }))
-  on('session.id', () => ({ value: 'sess-1' }))
-  on('fs.list', () => ({ value: [{ name: '-work', kind: 'dir', size: 0, mtimeMs: 0, isLink: false }] }))
-  on('fs.exists', ($, e) => ({ value: e.path === dir || e.path === `${dir}/1.png` }))
-  on('fs.read', () => ({ value: { base64: pngHead(800, 400) } }))
-  on('ui.render', () => ({ type: 'Text', props: {}, children: ['engine band'] }))
+  engine(on, { text: 'see [Image #1]' }, false)
 
   await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/work' })
   await clock.advance(200)

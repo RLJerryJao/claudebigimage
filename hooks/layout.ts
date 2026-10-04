@@ -7,6 +7,8 @@ export const DEFAULT_LIMITS: Limits = { rows: 20, columns: 80 }
 // The Image element takes 1 to 255 cells each way.
 const MAX_CELLS = 255
 const MIN_COLUMNS = 4
+// Past this many images the pane scrolls rather than shrinking each one further.
+const MIN_PANE_ROWS = 8
 // Outside fullscreen the band may be as tall as the terminal; leave the rest for the transcript.
 const MAX_SCREEN_SHARE = 2 / 3
 // A terminal cell is about twice as tall as it is wide.
@@ -78,4 +80,30 @@ export function fitRow(
     if (width <= bodyColumns) return cells
   }
   return sizes.map(size => fitCells(size, 1, widest))
+}
+
+/**
+ * Picture boxes for the preview pane, stacked one per image with a label row under each:
+ * as tall as `bodyRows` shares out (the pane scrolls past that), within `limits` and `bodyColumns`.
+ */
+export function fitColumn(
+  sizes: readonly (Size | null)[],
+  bodyRows: number,
+  bodyColumns: number,
+  limits: Limits = DEFAULT_LIMITS,
+): Cells[] {
+  const count = Math.max(1, sizes.length)
+  const share = Math.floor((bodyRows - count) / count)
+  const tall = Math.min(limits.rows, Math.max(MIN_PANE_ROWS, share))
+  const widest = Math.max(MIN_COLUMNS, Math.min(limits.columns, bodyColumns))
+  return sizes.map(size => fitCells(size, tall, widest))
+}
+
+/** The pane size to ask for: the rows the stacked previews want inline, the columns they want docked. */
+export function paneRequest(sizes: readonly (Size | null)[], limits: Limits = DEFAULT_LIMITS): Cells {
+  const cells = sizes.map(size => fitCells(size, limits.rows, limits.columns))
+  return {
+    rows: cells.reduce((sum, c) => sum + c.rows + 1, 0),
+    columns: Math.max(MIN_COLUMNS, ...cells.map(c => c.columns)),
+  }
 }

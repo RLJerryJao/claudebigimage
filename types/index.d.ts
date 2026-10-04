@@ -8,6 +8,10 @@ export type PastedImage = {
 
 declare module 'claude-code' {
   interface PluginState {
-    'image-view': { images: PastedImage[] }
+    'image-view': {
+      images: PastedImage[]
+      /** True while the preview pane is drawn, so the band above the prompt stays empty. */
+      paneShown: boolean
+    }
   }
 }
