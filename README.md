@@ -1,42 +1,42 @@
 # Claude Big Image
 
-A Claude Code mod that shows the images you paste as big previews above your prompt, instead of bare `[Image #1]` tags or tiny thumbnails.
+讓你在 Claude Code 貼上的圖片，直接以大尺寸預覽顯示在提示框上方，不再只有光禿禿的 `[Image #1]` 標籤或小小的縮圖。
 
-A fork of [jarrodwatts/claude-image-view](https://github.com/jarrodwatts/claude-image-view) that draws larger previews (20 rows × 80 columns by default instead of 6 × 32) and makes the size configurable.
+本專案 fork 自 [jarrodwatts/claude-image-view](https://github.com/jarrodwatts/claude-image-view)，把預覽放大（預設最大 20 列 × 80 欄，原版是 6 × 32），尺寸也可以自己設定，並加上可停靠在對話旁的大圖預覽 Pane。
 
 [![License](https://img.shields.io/github/license/joshhu/claudebigimage)](LICENSE)
 
-![Claude Image View in action](claude-image-view.png)
+![Claude Big Image 實際畫面](claudebigimage.png)
 
-## Install
+## 安裝
 
-Inside Claude Code, run:
+在 Claude Code 裡執行：
 
 ```
 /plugin marketplace add joshhu/claudebigimage
-/plugin install image-view
+/plugin install image-view@claudebigimage
 /reload-plugins
 ```
 
-That's it. Paste an image into the prompt and its preview appears above the input.
+這樣就完成了。在提示框貼上圖片，預覽就會出現在輸入框上方。
 
-If you also have the original `image-view@claude-image-view` installed, disable it so only one of them draws.
+如果你也裝了原版的 `image-view@claude-image-view`，請先停用，避免兩個同時畫圖。
 
 <details>
-<summary><strong>Prefer the terminal?</strong></summary>
+<summary><strong>想用終端機指令安裝？</strong></summary>
 
 ```bash
 claude plugin marketplace add joshhu/claudebigimage
 claude plugin install image-view@claudebigimage
 ```
 
-Then run `/reload-plugins` inside a session, or start a new one.
+接著在 session 裡執行 `/reload-plugins`，或開一個新的 session。
 
 </details>
 
-## What You See
+## 使用起來的樣子
 
-Paste one or more images and a row of thumbnails sits above the prompt, each labelled with the number of its tag:
+貼上一張或多張圖片，提示框上方會出現一排預覽，每張都標上對應的標籤編號：
 
 ```
 ╭────────────────────────╮ ╭────────────╮
@@ -45,81 +45,81 @@ Paste one or more images and a row of thumbnails sits above the prompt, each lab
 │                        │ │            │
 │           #1           │ │     #2     │
 ╰────────────────────────╯ ╰────────────╯
-❯ why is the header misaligned here [Image #1] vs [Image #2]
+❯ 為什麼這裡的標題沒對齊 [Image #1] vs [Image #2]
 ```
 
-- **Big previews in a pane.** On a wide terminal (144 columns or more) pasted images open in an *Image preview* pane: docked beside the transcript, floor to ceiling, in fullscreen, or above the prompt otherwise. Each image shows up to 20 rows tall and 80 columns wide by default (see [Configuration](#configuration)).
-- **`/image-view` opens it anywhere.** On a narrower terminal the images show in the row above the prompt instead; run `/image-view` to open the pane at any width. Close the pane and it stays closed until you paste a different image.
-- **Thumbnails appear as soon as you paste.** You don't have to type another key first.
-- **Thumbnails keep their shape.** Wide screenshots stay wide and phone shots stay tall.
-- **Always fits on screen.** Tiles shrink to fit the space above the prompt (and never take more than two thirds of the terminal's height), so the row never scrolls or gets cut off.
-- **Clears on send.** Once the prompt is sent (or the tags are deleted), the row and the pane go away.
+- **用 Pane 顯示大圖。** 終端機夠寬（144 欄以上）時，貼上的圖片會自動在「Image preview」Pane 裡打開：全螢幕模式下停靠在對話旁邊、從頂到底整個高度都能用，否則放在提示框上方。每張圖預設最大 20 列高、80 欄寬（見[設定](#設定)）。
+- **`/image-view` 隨時打開。** 終端機比較窄時，圖片會改顯示在提示框上方那一排；執行 `/image-view` 可以在任何寬度打開 Pane。手動關掉 Pane 後，要等你貼上不同的圖片才會再自動打開。
+- **一貼上就顯示。** 不用再多按一個鍵。
+- **保持原本比例。** 寬的截圖維持寬的，手機直式截圖維持直的。
+- **一定放得進畫面。** 預覽會縮到剛好放得進提示框上方的空間（而且不超過終端機高度的三分之二），不會捲動或被切掉。
+- **送出後自動清除。** 提示送出（或刪掉標籤）之後，預覽和 Pane 都會消失。
 
-## Configuration
+## 設定
 
-The largest size a preview may take is set by two options. Change them in the `/plugin` config menu, or in `~/.claude/settings.json` under `pluginConfigs`:
+預覽的最大尺寸由兩個選項控制。可以在 `/plugin` 的設定選單修改，或寫在 `~/.claude/settings.json` 的 `pluginConfigs` 底下：
 
-| Option | Default | Meaning |
+| 選項 | 預設值 | 說明 |
 | --- | --- | --- |
-| `maxHeight` | `20` | Tallest a preview may be, in terminal rows (1–255). |
-| `maxWidth` | `80` | Widest a preview may be, in terminal columns (4–255). |
+| `maxHeight` | `20` | 預覽最多幾列高（1–255）。 |
+| `maxWidth` | `80` | 預覽最多幾欄寬（4–255）。 |
 
-Previews still shrink to fit the terminal, so a large value is safe. Set `maxHeight` to `6` and `maxWidth` to `32` for the original small thumbnails.
+預覽一定會縮到終端機放得下的大小，所以設大一點也沒關係。把 `maxHeight` 設成 `6`、`maxWidth` 設成 `32`，就是原版的小縮圖。
 
-## How It Works
+## 運作原理
 
-Claude Code saves every pasted image to a cache folder for the session, as `<tmp>/<project>/<session>/images/<n>.png`, and puts an `[Image #n]` tag in the prompt. Claude Big Image is a [mod](https://code.claude.com/docs/en/plugins/mods/overview):
+Claude Code 會把每張貼上的圖片存到這個 session 的快取資料夾 `<tmp>/<project>/<session>/images/<n>.png`，並在提示框放一個 `[Image #n]` 標籤。Claude Big Image 是一個 [mod](https://code.claude.com/docs/en/plugins/mods/overview)：
 
-1. Every 200ms it reads the prompt box and looks for `[Image #n]` tags. It checks on a timer because pasting an image doesn't raise an edit event.
-2. For each tag it finds the cached PNG and reads its size from the PNG header.
-3. It opens a pane for them, or draws them in the band above the prompt when the pane can't be seated, with Claude Code's `Image` element. The terminal reads the file itself, so the image data never passes through the mod.
+1. 每 200ms 讀一次提示框內容，找出 `[Image #n]` 標籤。之所以用計時器輪詢，是因為貼上圖片不會觸發編輯事件。
+2. 對每個標籤找到快取的 PNG，從 PNG 檔頭讀出圖片尺寸。
+3. 用 Claude Code 的 `Image` 元件把圖片畫在 Pane 裡；Pane 沒辦法顯示時，改畫在提示框上方。圖片檔由終端機自己讀取，圖片資料不會經過這個 mod。
 
-## Security
+## 安全性
 
-Claude Big Image is local-only. It makes no network requests and writes no files. It reads the prompt box, lists Claude Code's temp folder to find the current session's image cache, and reads the first bytes of each pasted image. If `CLAUDE_CODE_TMPDIR` isn't set, it runs `id -u` once to find the default temp folder.
+Claude Big Image 只在本機運作，不發出任何網路請求，也不寫入任何檔案。它只會讀取提示框內容、列出 Claude Code 的暫存資料夾來找到目前 session 的圖片快取，以及讀取每張圖片開頭的幾個位元組。如果沒有設定 `CLAUDE_CODE_TMPDIR`，它會執行一次 `id -u` 來找出預設的暫存資料夾。
 
-Run `claude plugin validate` on the repo to see every event it hooks and every call it makes.
+對這個 repo 執行 `claude plugin validate`，可以看到它掛了哪些事件、呼叫了哪些 API。
 
-## Requirements
+## 系統需求
 
-- Claude Code v2.1.287 or later (mods support)
-- macOS or Linux
-- A terminal with the kitty graphics protocol, such as [Ghostty](https://ghostty.org) or [kitty](https://sw.kovidgoyal.net/kitty/)
+- Claude Code v2.1.287 以上（支援 mods）
+- macOS 或 Linux
+- 支援 kitty 圖片協定的終端機，例如 [Ghostty](https://ghostty.org) 或 [kitty](https://sw.kovidgoyal.net/kitty/)
 
-Other terminals show `[Image #n]` in each tile instead of the picture. The Claude Desktop app already previews pasted images, so the mod draws nothing there.
+其他終端機只會在每個框裡顯示 `[Image #n]` 文字，不會顯示圖片。Claude 桌面版本身就會預覽貼上的圖片，所以這個 mod 在那裡不會畫任何東西。
 
-## Troubleshooting
+## 疑難排解
 
-**The images are still small.** The terminal is too small to give them room. In fullscreen the band above the prompt gets at most half the terminal's height, so a 25-row window leaves the pictures about 2 rows. Make the window bigger, or run `/image-view` to show them in the preview pane (it opens by itself only from 144 columns, and from 110 once you've opened it with `/image-view`).
+**圖片還是很小。** 終端機視窗太小，騰不出空間。全螢幕模式下，提示框上方的區域最多只有終端機高度的一半，25 列的視窗只剩大約 2 列給圖片。把視窗放大，或執行 `/image-view` 改用預覽 Pane 顯示（Pane 要 144 欄以上才會自動打開；用 `/image-view` 開過一次之後，110 欄以上就會自動打開）。
 
-**Nothing appears when I paste.** Run `/plugin` and check the dim line under the tabs lists `image-view` as an active mod. If it isn't listed, run `/reload-plugins`.
+**貼上之後什麼都沒出現。** 執行 `/plugin`，確認分頁下方那行灰字有列出 `image-view` 是啟用中的 mod。沒有的話，執行 `/reload-plugins`。
 
-**The tile says "no preview".** The mod couldn't find the cached file. Claude Code may have moved where it stores pasted images. Please [open an issue](https://github.com/joshhu/claudebigimage/issues) with your Claude Code version.
+**框裡顯示「no preview」。** mod 找不到快取的圖片檔，可能是 Claude Code 改了貼上圖片的存放位置。請附上你的 Claude Code 版本[開一個 issue](https://github.com/joshhu/claudebigimage/issues)。
 
-**The tile shows `[Image #1]` text instead of the picture.** Your terminal doesn't support the kitty graphics protocol. See [Requirements](#requirements).
+**框裡顯示 `[Image #1]` 文字而不是圖片。** 你的終端機不支援 kitty 圖片協定，請參考[系統需求](#系統需求)。
 
-**The tile shows `[Image #1]` text in agent view or a background session, even in Ghostty or kitty.** Claude Code turns terminal images off for background sessions. If you attach from a terminal with the kitty graphics protocol, turn them back on in the `env` block of `~/.claude/settings.json`, then start a new session:
+**在 agent view 或背景 session 裡，就算用 Ghostty 或 kitty 也只顯示 `[Image #1]` 文字。** Claude Code 會在背景 session 關閉終端機圖片。如果你是從支援 kitty 圖片協定的終端機連進去，可以在 `~/.claude/settings.json` 的 `env` 區塊把它打開，再開一個新的 session：
 
 ```json
 "env": { "CLAUDE_CODE_FORCE_TERMINAL_IMAGES": "1" }
 ```
 
-## Development
+## 開發
 
 ```bash
 git clone https://github.com/joshhu/claudebigimage
 cd claudebigimage
 
-# Load it for one session without installing
+# 不安裝，只在這次 session 載入
 claude --plugin-dir .
 
-# Check it and run the tests
+# 檢查並執行測試
 claude plugin validate .
 claude plugin test .
 ```
 
-Claude Code writes the API types into `.claude-plugin/types/` the first time it loads the mod, and `tsc -p .` type-checks it from then on.
+Claude Code 第一次載入這個 mod 時，會把 API 型別寫進 `.claude-plugin/types/`，之後就可以用 `tsc -p .` 做型別檢查。
 
-## License
+## 授權
 
-MIT. See [LICENSE](LICENSE). Based on [claude-image-view](https://github.com/jarrodwatts/claude-image-view) by Jarrod Watts.
+MIT，詳見 [LICENSE](LICENSE)。本專案改自 Jarrod Watts 的 [claude-image-view](https://github.com/jarrodwatts/claude-image-view)。
