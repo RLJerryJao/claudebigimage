@@ -1,9 +1,10 @@
-# Claude Image View
+# Claude Big Image
 
-A Claude Code mod that shows the images you paste, so you see thumbnails above your prompt instead of bare `[Image #1]` tags.
+A Claude Code mod that shows the images you paste as big previews above your prompt, instead of bare `[Image #1]` tags or tiny thumbnails.
 
-[![License](https://img.shields.io/github/license/jarrodwatts/claude-image-view?v=2)](LICENSE)
-[![Stars](https://img.shields.io/github/stars/jarrodwatts/claude-image-view)](https://github.com/jarrodwatts/claude-image-view/stargazers)
+A fork of [jarrodwatts/claude-image-view](https://github.com/jarrodwatts/claude-image-view) that draws larger previews (20 rows × 80 columns by default instead of 6 × 32) and makes the size configurable.
+
+[![License](https://img.shields.io/github/license/joshhu/claudebigimage)](LICENSE)
 
 ![Claude Image View in action](claude-image-view.png)
 
@@ -12,19 +13,21 @@ A Claude Code mod that shows the images you paste, so you see thumbnails above y
 Inside Claude Code, run:
 
 ```
-/plugin marketplace add jarrodwatts/claude-image-view
+/plugin marketplace add joshhu/claudebigimage
 /plugin install image-view
 /reload-plugins
 ```
 
-That's it. Paste an image into the prompt and its thumbnail appears above the input.
+That's it. Paste an image into the prompt and its preview appears above the input.
+
+If you also have the original `image-view@claude-image-view` installed, disable it so only one of them draws.
 
 <details>
 <summary><strong>Prefer the terminal?</strong></summary>
 
 ```bash
-claude plugin marketplace add jarrodwatts/claude-image-view
-claude plugin install image-view@claude-image-view
+claude plugin marketplace add joshhu/claudebigimage
+claude plugin install image-view@claudebigimage
 ```
 
 Then run `/reload-plugins` inside a session, or start a new one.
@@ -46,13 +49,25 @@ Paste one or more images and a row of thumbnails sits above the prompt, each lab
 ```
 
 - **Thumbnails appear as soon as you paste.** You don't have to type another key first.
+- **Big previews, not tiny thumbnails.** A pasted image shows up to 20 rows tall and 80 columns wide by default (see [Configuration](#configuration)).
 - **Thumbnails keep their shape.** Wide screenshots stay wide and phone shots stay tall.
-- **Always fits on screen.** Tiles shrink to fit the space above the prompt, so the row never scrolls or gets cut off.
+- **Always fits on screen.** Tiles shrink to fit the space above the prompt (and never take more than two thirds of the terminal's height), so the row never scrolls or gets cut off.
 - **Clears on send.** Once the prompt is sent (or the tags are deleted), the row goes away.
+
+## Configuration
+
+The largest size a preview may take is set by two options. Change them in the `/plugin` config menu, or in `~/.claude/settings.json` under `pluginConfigs`:
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `maxHeight` | `20` | Tallest a preview may be, in terminal rows (1–255). |
+| `maxWidth` | `80` | Widest a preview may be, in terminal columns (4–255). |
+
+Previews still shrink to fit the terminal, so a large value is safe. Set `maxHeight` to `6` and `maxWidth` to `32` for the original small thumbnails.
 
 ## How It Works
 
-Claude Code saves every pasted image to a cache folder for the session, as `<tmp>/<project>/<session>/images/<n>.png`, and puts an `[Image #n]` tag in the prompt. Claude Image View is a [mod](https://code.claude.com/docs/en/plugins/mods/overview):
+Claude Code saves every pasted image to a cache folder for the session, as `<tmp>/<project>/<session>/images/<n>.png`, and puts an `[Image #n]` tag in the prompt. Claude Big Image is a [mod](https://code.claude.com/docs/en/plugins/mods/overview):
 
 1. Every 200ms it reads the prompt box and looks for `[Image #n]` tags. It checks on a timer because pasting an image doesn't raise an edit event.
 2. For each tag it finds the cached PNG and reads its size from the PNG header.
@@ -60,7 +75,7 @@ Claude Code saves every pasted image to a cache folder for the session, as `<tmp
 
 ## Security
 
-Claude Image View is local-only. It makes no network requests and writes no files. It reads the prompt box, lists Claude Code's temp folder to find the current session's image cache, and reads the first bytes of each pasted image. If `CLAUDE_CODE_TMPDIR` isn't set, it runs `id -u` once to find the default temp folder.
+Claude Big Image is local-only. It makes no network requests and writes no files. It reads the prompt box, lists Claude Code's temp folder to find the current session's image cache, and reads the first bytes of each pasted image. If `CLAUDE_CODE_TMPDIR` isn't set, it runs `id -u` once to find the default temp folder.
 
 Run `claude plugin validate` on the repo to see every event it hooks and every call it makes.
 
@@ -76,7 +91,7 @@ Other terminals show `[Image #n]` in each tile instead of the picture. The Claud
 
 **Nothing appears when I paste.** Run `/plugin` and check the dim line under the tabs lists `image-view` as an active mod. If it isn't listed, run `/reload-plugins`.
 
-**The tile says "no preview".** The mod couldn't find the cached file. Claude Code may have moved where it stores pasted images. Please [open an issue](https://github.com/jarrodwatts/claude-image-view/issues) with your Claude Code version.
+**The tile says "no preview".** The mod couldn't find the cached file. Claude Code may have moved where it stores pasted images. Please [open an issue](https://github.com/joshhu/claudebigimage/issues) with your Claude Code version.
 
 **The tile shows `[Image #1]` text instead of the picture.** Your terminal doesn't support the kitty graphics protocol. See [Requirements](#requirements).
 
@@ -89,8 +104,8 @@ Other terminals show `[Image #n]` in each tile instead of the picture. The Claud
 ## Development
 
 ```bash
-git clone https://github.com/jarrodwatts/claude-image-view
-cd claude-image-view
+git clone https://github.com/joshhu/claudebigimage
+cd claudebigimage
 
 # Load it for one session without installing
 claude --plugin-dir .
@@ -104,8 +119,4 @@ Claude Code writes the API types into `.claude-plugin/types/` the first time it 
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
-
-## Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=jarrodwatts/claude-image-view&type=Date)](https://star-history.com/#jarrodwatts/claude-image-view&Date)
+MIT. See [LICENSE](LICENSE). Based on [claude-image-view](https://github.com/jarrodwatts/claude-image-view) by Jarrod Watts.

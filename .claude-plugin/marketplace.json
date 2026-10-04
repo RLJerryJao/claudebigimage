@@ -1,14 +1,14 @@
 {
-  "name": "claude-image-view",
+  "name": "claudebigimage",
   "owner": {
-    "name": "Jarrod Watts",
-    "url": "https://github.com/jarrodwatts"
+    "name": "joshhu",
+    "url": "https://github.com/joshhu"
   },
   "plugins": [
     {
       "name": "image-view",
       "source": "./",
-      "description": "See the images you paste into Claude Code: thumbnails above the prompt instead of bare [Image #1] tags",
+      "description": "See the images you paste into Claude Code as big previews above the prompt instead of bare [Image #1] tags",
       "category": "productivity",
       "tags": [
         "images",
@@ -21,6 +21,6 @@
     }
   ],
   "metadata": {
-    "description": "See the images you paste into Claude Code"
+    "description": "See the images you paste into Claude Code as big previews"
   }
 }

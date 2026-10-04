@@ -1,14 +1,32 @@
 {
   "name": "image-view",
-  "description": "See the images you paste into Claude Code: thumbnails above the prompt instead of bare [Image #1] tags",
-  "version": "0.1.0",
+  "description": "See the images you paste into Claude Code as big previews above the prompt instead of bare [Image #1] tags",
+  "version": "0.2.0",
   "author": {
-    "name": "Jarrod Watts",
-    "url": "https://github.com/jarrodwatts"
+    "name": "joshhu",
+    "url": "https://github.com/joshhu"
   },
-  "homepage": "https://github.com/jarrodwatts/claude-image-view",
-  "repository": "https://github.com/jarrodwatts/claude-image-view",
+  "homepage": "https://github.com/joshhu/claudebigimage",
+  "repository": "https://github.com/joshhu/claudebigimage",
   "license": "MIT",
   "keywords": ["images", "paste", "preview", "thumbnails", "mod", "terminal", "claude-code"],
-  "types": "./types/index.d.ts"
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "maxHeight": {
+      "type": "number",
+      "title": "Max image height (rows)",
+      "description": "Tallest an image preview may be, in terminal rows. It still shrinks to fit the space above the prompt.",
+      "default": 20,
+      "min": 1,
+      "max": 255
+    },
+    "maxWidth": {
+      "type": "number",
+      "title": "Max image width (columns)",
+      "description": "Widest an image preview may be, in terminal columns. It still shrinks to fit the terminal's width.",
+      "default": 80,
+      "min": 4,
+      "max": 255
+    }
+  }
 }

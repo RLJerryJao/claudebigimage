@@ -2,7 +2,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
 import type { PastedImage } from '../types'
-import { fitRow, imageNumbers, pngSize } from './layout'
+import { clampLimits, fitRow, imageNumbers, pngSize } from './layout'
 import type { Size } from './layout'
 
 // Pasting an image raises no prompt.edit (the tag only shows up on the next keystroke),
@@ -75,7 +75,9 @@ async function check($: EngineInterface) {
   }
 }
 
-export const register: Register = on => {
+export const register: Register = (on, options) => {
+  const limits = clampLimits(options.maxHeight, options.maxWidth)
+
   on('session.start', async ($, e, next) => {
     $.clock.every(POLL_MS, () => check($))
     return next(e)
@@ -87,7 +89,7 @@ export const register: Register = on => {
     if (list.length === 0) return next(e)
 
     const { Box, Image, Text } = $.ui.resolve(e)
-    const cells = fitRow(list.map(image => image.size), e.props.maxRows, e.props.bodyColumns)
+    const cells = fitRow(list.map(image => image.size), e.props.maxRows, e.props.bodyColumns, limits, e.viewport?.rows)
     const below = await next(e)
 
     return (

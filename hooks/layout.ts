@@ -1,9 +1,14 @@
 export type Size = { width: number; height: number }
 export type Cells = { columns: number; rows: number }
+/** The largest picture box one image may take, before the band's own limits apply. */
+export type Limits = { rows: number; columns: number }
 
-const TILE_ROWS = 6
-const MAX_COLUMNS = 32
+export const DEFAULT_LIMITS: Limits = { rows: 20, columns: 80 }
+// The Image element takes 1 to 255 cells each way.
+const MAX_CELLS = 255
 const MIN_COLUMNS = 4
+// Outside fullscreen the band may be as tall as the terminal; leave the rest for the transcript.
+const MAX_SCREEN_SHARE = 2 / 3
 // A terminal cell is about twice as tall as it is wide.
 const CELL_ASPECT = 2
 // Used when the size is unknown (file over $.fs.read's 4 MiB cap, or no file).
@@ -32,28 +37,45 @@ export function pngSize(base64: string): Size | null {
   return width > 0 && height > 0 ? { width, height } : null
 }
 
-/** A picture box `rows` tall that keeps the picture's aspect ratio. */
-export function fitCells(size: Size | null, tileRows = TILE_ROWS): Cells {
+/** Configured limits, clamped to what the Image element can draw. */
+export function clampLimits(rows: unknown, columns: unknown): Limits {
+  const clamp = (value: unknown, fallback: number, min: number) =>
+    typeof value === 'number' && Number.isFinite(value) ? Math.min(MAX_CELLS, Math.max(min, Math.round(value))) : fallback
+  return { rows: clamp(rows, DEFAULT_LIMITS.rows, 1), columns: clamp(columns, DEFAULT_LIMITS.columns, MIN_COLUMNS) }
+}
+
+/** A picture box `tileRows` tall, at most `maxColumns` wide, that keeps the picture's aspect ratio. */
+export function fitCells(size: Size | null, tileRows = DEFAULT_LIMITS.rows, maxColumns = DEFAULT_LIMITS.columns): Cells {
   const { width, height } = size ?? FALLBACK
   let rows = tileRows
   let columns = Math.round((rows * CELL_ASPECT * width) / height)
-  if (columns > MAX_COLUMNS) {
-    columns = MAX_COLUMNS
-    rows = Math.max(1, Math.round((MAX_COLUMNS * height) / (CELL_ASPECT * width)))
+  if (columns > maxColumns) {
+    columns = maxColumns
+    rows = Math.max(1, Math.round((maxColumns * height) / (CELL_ASPECT * width)))
   }
   return { columns: Math.max(MIN_COLUMNS, columns), rows: Math.min(rows, tileRows) }
 }
 
 /**
  * Picture boxes for one row of tiles that fits the band whole, so it never scrolls:
- * the tallest tiles whose chrome fits in `maxRows` and whose total width fits in `bodyColumns`.
+ * the tallest tiles within `limits` whose chrome fits in `maxRows` (and in two thirds of
+ * `screenRows`, when known) and whose total width fits in `bodyColumns`.
  */
-export function fitRow(sizes: readonly (Size | null)[], maxRows: number, bodyColumns: number): Cells[] {
-  const tallest = Math.max(1, Math.min(TILE_ROWS, maxRows - TILE_CHROME_ROWS))
+export function fitRow(
+  sizes: readonly (Size | null)[],
+  maxRows: number,
+  bodyColumns: number,
+  limits: Limits = DEFAULT_LIMITS,
+  screenRows?: number,
+): Cells[] {
+  const bandRows = screenRows === undefined ? maxRows : Math.min(maxRows, Math.floor(screenRows * MAX_SCREEN_SHARE))
+  const tallest = Math.max(1, Math.min(limits.rows, bandRows - TILE_CHROME_ROWS))
+  // No tile is wider than the band can hold on its own.
+  const widest = Math.max(MIN_COLUMNS, Math.min(limits.columns, bodyColumns - TILE_CHROME_COLUMNS))
   for (let tileRows = tallest; tileRows > 1; tileRows--) {
-    const cells = sizes.map(size => fitCells(size, tileRows))
+    const cells = sizes.map(size => fitCells(size, tileRows, widest))
     const width = cells.reduce((sum, c) => sum + c.columns + TILE_CHROME_COLUMNS, 0) + GAP * (cells.length - 1)
     if (width <= bodyColumns) return cells
   }
-  return sizes.map(size => fitCells(size, 1))
+  return sizes.map(size => fitCells(size, 1, widest))
 }
