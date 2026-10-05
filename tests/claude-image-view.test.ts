@@ -101,13 +101,13 @@ const PANE = {
 type On = Parameters<TestBody>[1]
 
 /** Stands in for the engine: a draft, one cached 800x400 PNG (#1), and a pane seated or not. */
-function engine(on: On, draft: { text: string }, isPlaced: boolean) {
+function engine(on: On, draft: { text: string }, isPlaced: boolean, env?: Record<string, string>) {
   const calls = { opened: [] as unknown[], closed: 0, toasts: [] as string[] }
   let isOpen = false
   on('session.start', () => ({ cwd: '/work' }))
   on('command.register', ($, e) => ({ value: { command: e.name } }))
   on('prompt.read', () => ({ value: { text: draft.text, cursor: draft.text.length } }))
-  on('env.get', () => ({ value: '/tmp/claude-501' }))
+  on('env.get', ($, e) => ({ value: env ? env[e.name] : '/tmp/claude-501' }))
   on('session.id', () => ({ value: 'sess-1' }))
   // Another project's folder and a stray file sit beside the one holding this session.
   const entry = { size: 0, mtimeMs: 0, isLink: false }
@@ -201,4 +201,19 @@ test('the size limits come from the plugin options', { options: { maxHeight: 6, 
 
   const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
   expect((await ui.find({ type: 'Image' }))?.props).toMatchObject({ columns: 24, rows: 6 })
+})
+
+test('on Windows the cache is found under %TEMP%\claude without running id', async ($, on) => {
+  const clock = mock.clock(on)
+  engine(on, { text: 'see [Image #1]' }, false, { OS: 'Windows_NT', TEMP: 'C:\Users\me\AppData\Local\Temp' })
+  const listed: string[] = []
+  on('fs.list', ($, e) => {
+    listed.push(e.path)
+    return { value: [] }
+  })
+
+  await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/work' })
+  await clock.advance(200)
+
+  expect(listed).toEqual(['C:/Users/me/AppData/Local/Temp/claude'])
 })

@@ -37,7 +37,13 @@ async function imagesDir($: EngineInterface): Promise<string | undefined> {
   if (found?.sessionId === sessionId) return found.dir
   if (tmpRoot === undefined) {
     const fromEnv = await $.env.get('CLAUDE_CODE_TMPDIR')
-    tmpRoot = fromEnv ?? `/tmp/claude-${(await $.process.run(['id', '-u'])).stdout.trim()}`
+    // Windows has no /tmp or `id`; Claude Code caches under %TEMP%\claude there.
+    const winTemp = fromEnv === undefined && (await $.env.get('OS')) === 'Windows_NT' ? await $.env.get('TEMP') : undefined
+    tmpRoot =
+      fromEnv ??
+      (winTemp !== undefined
+        ? `${winTemp.replace(/\\/g, '/')}/claude`
+        : `/tmp/claude-${(await $.process.run(['id', '-u'])).stdout.trim()}`)
   }
   const entries = await $.fs.list(tmpRoot).catch(() => [])
   for (const entry of entries) {
